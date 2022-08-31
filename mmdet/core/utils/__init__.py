@@ -4,6 +4,7 @@ from .dist_utils import (DistOptimizerHook, all_reduce_dict, allreduce_grads,
 from .misc import (center_of_mass, filter_scores_and_topk, flip_tensor,
                    generate_coordinate, mask2ndarray, multi_apply,
                    select_single_mlvl, unmap)
+from .multi_eval_hook import MultiEvalHook
 
 __all__ = [
     'allreduce_grads', 'DistOptimizerHook', 'reduce_mean', 'multi_apply',
