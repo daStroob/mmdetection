@@ -10,5 +10,5 @@ __all__ = [
     'allreduce_grads', 'DistOptimizerHook', 'reduce_mean', 'multi_apply',
     'unmap', 'mask2ndarray', 'flip_tensor', 'all_reduce_dict',
     'center_of_mass', 'generate_coordinate', 'select_single_mlvl',
-    'filter_scores_and_topk', 'sync_random_seed'
+    'filter_scores_and_topk', 'sync_random_seed', 'MyHook'
 ]
