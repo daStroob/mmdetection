@@ -20,6 +20,55 @@ def _calc_dynamic_intervals(start_interval, dynamic_interval_list):
         [dynamic_interval[1] for dynamic_interval in dynamic_interval_list])
     return dynamic_milestones, dynamic_intervals
 
+class MultiEvalHook(BaseEvalHook):
+    def __init__(self, *args, dataset_name='', dynamic_intervals=None, **kwargs):
+        super(MultiEvalHook, self).__init__(*args, **kwargs)
+        self.dataset_name = dataset_name
+
+        self.use_dynamic_intervals = dynamic_intervals is not None
+        if self.use_dynamic_intervals:
+            self.dynamic_milestones, self.dynamic_intervals = \
+                _calc_dynamic_intervals(self.interval, dynamic_intervals)
+    
+    def _decide_interval(self, runner):
+        if self.use_dynamic_intervals:
+            progress = runner.epoch if self.by_epoch else runner.iter
+            step = bisect.bisect(self.dynamic_milestones, (progress + 1))
+            # Dynamically modify the evaluation interval
+            self.interval = self.dynamic_intervals[step - 1]
+
+    def before_train_epoch(self, runner):
+        """Evaluate the model only at the start of training by epoch."""
+        self._decide_interval(runner)
+        super().before_train_epoch(runner)
+
+    def before_train_iter(self, runner):
+        self._decide_interval(runner)
+        super().before_train_iter(runner)
+
+    def _do_evaluate(self, runner):
+        """perform evaluation and save ckpt."""
+        if not self._should_evaluate(runner):
+            return
+
+        from mmdet.apis import single_gpu_test
+
+        # Changed results to self.results so that MMDetWandbHook can access
+        # the evaluation results and log them to wandb.
+        results = single_gpu_test(runner.model, self.dataloader, show=False)
+        runner.log_buffer.output['eval_iter_num'] = len(self.dataloader)
+        key_score = self.evaluate(runner, results)
+
+    def evaluate(self, runner, results):
+        eval_res = self.dataloader.dataset.evaluate(
+            results, logger=runner.logger, **self.eval_kwargs)
+
+        dataset_prefix = ''
+        if not self.dataset_name == '':
+            dataset_prefix = f'{self.dataset_name}_'
+        for name, val in eval_res.items():
+            runner.log_buffer.output[dataset_prefix+name] = val
+        runner.log_buffer.ready = True
 
 class EvalHook(BaseEvalHook):
 
@@ -65,7 +114,6 @@ class EvalHook(BaseEvalHook):
         # the best checkpoint
         if self.save_best and key_score:
             self._save_ckpt(runner, key_score)
-
 
 # Note: Considering that MMCV's EvalHook updated its interface in V1.3.16,
 # in order to avoid strong version dependency, we did not directly

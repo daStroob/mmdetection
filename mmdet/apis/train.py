@@ -9,7 +9,8 @@ from mmcv.runner import (DistSamplerSeedHook, EpochBasedRunner,
                          Fp16OptimizerHook, OptimizerHook, build_runner,
                          get_dist_info)
 
-from mmdet.core import DistEvalHook, EvalHook, build_optimizer
+from mmdet.core import DistEvalHook, EvalHook, MultiEvalHook, build_optimizer
+from mmdet.core.evaluation.eval_hooks import MultiEvalHook
 from mmdet.datasets import (build_dataloader, build_dataset,
                             replace_ImageToTensor)
 from mmdet.utils import (build_ddp, build_dp, compat_cfg,
@@ -230,6 +231,23 @@ def train_detector(model,
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         runner.register_hook(
             eval_hook(val_dataloader, **eval_cfg), priority='LOW')
+
+        if hasattr(cfg.data, 'multi_val'):
+            for key, val_dataset in cfg.data.multi_val.items():
+                val_set =  cfg.data.val
+                val_set.ann_file = val_dataset.ann_file
+                val_set.img_prefix = val_dataset.img_prefix
+
+                val_dataset = build_dataset(val_set, dict(test_mode=True))
+
+                val_dataloader = build_dataloader(val_dataset, **val_dataloader_args)
+                eval_cfg = cfg.get('evaluation', {})
+                eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
+                eval_hook = MultiEvalHook
+                # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
+                # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
+                runner.register_hook(
+                    eval_hook(val_dataloader, dataset_name=key, **eval_cfg, out_dir=key), priority='LOW')
 
     resume_from = None
     if cfg.resume_from is None and cfg.get('auto_resume'):
