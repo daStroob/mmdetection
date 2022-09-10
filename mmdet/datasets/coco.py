@@ -636,7 +636,7 @@ class CocoDataset(CustomDataset):
                 raise KeyError(f'metric {metric} is not supported')
 
         coco_gt = self.coco
-        self.cat_ids = coco_gt.get_cat_ids(cat_names=self.CLASSES)
+        self.cat_ids = [0,1,2,3,4,5,6,7,8]
 
         result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
         eval_results = self.evaluate_det_segm(results, result_files, coco_gt,

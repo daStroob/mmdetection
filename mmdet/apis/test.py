@@ -18,7 +18,8 @@ def single_gpu_test(model,
                     data_loader,
                     show=False,
                     out_dir=None,
-                    show_score_thr=0.3):
+                    show_score_thr=0.3,
+                    class_names=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -58,12 +59,13 @@ def single_gpu_test(model,
                     mask_color=PALETTE,
                     show=show,
                     out_file=out_file,
-                    score_thr=show_score_thr)
+                    score_thr=show_score_thr,
+                    class_names=class_names)
 
         # encode mask results
         if isinstance(result[0], tuple):
             result = [(bbox_results, encode_mask_results(mask_results))
-                      for bbox_results, mask_results in result]
+                      for bbox_results, mask_results, label_results in result]
         # This logic is only used in panoptic segmentation test.
         elif isinstance(result[0], dict) and 'ins_results' in result[0]:
             for j in range(len(result)):

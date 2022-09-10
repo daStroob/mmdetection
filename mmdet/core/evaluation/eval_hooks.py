@@ -72,9 +72,10 @@ class MultiEvalHook(BaseEvalHook):
 
 class EvalHook(BaseEvalHook):
 
-    def __init__(self, *args, dynamic_intervals=None, **kwargs):
+    def __init__(self, *args, dynamic_intervals=None, label_dict_conversion=None, **kwargs):
         super(EvalHook, self).__init__(*args, **kwargs)
         self.latest_results = None
+        self.label_dict_conversion = label_dict_conversion
 
         self.use_dynamic_intervals = dynamic_intervals is not None
         if self.use_dynamic_intervals:

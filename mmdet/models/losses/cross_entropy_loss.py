@@ -16,7 +16,8 @@ def cross_entropy(pred,
                   avg_factor=None,
                   class_weight=None,
                   ignore_index=-100,
-                  avg_non_ignore=False):
+                  avg_non_ignore=False,
+                  **kwargs):
     """Calculate the CrossEntropy loss.
 
     Args:
@@ -39,6 +40,20 @@ def cross_entropy(pred,
     # The default value of ignore_index is the same as F.cross_entropy
     ignore_index = -100 if ignore_index is None else ignore_index
     # element-wise losses
+    label_dict_conversion = kwargs['label_dict_conversion']
+
+    label_new = torch.zeros(pred.shape).cuda()
+    for index, obj_label in enumerate(label):
+        gt_labels = [0]*10
+        if obj_label.item() == -1:
+            label_new[index, 9] = 1
+            gt_labels[9] = 1
+        else:
+            for category in label_dict_conversion[obj_label.item()].values():
+                label_new[index, category] = 1
+                gt_labels[category] = 1
+    label = label_new
+
     loss = F.cross_entropy(
         pred,
         label,
@@ -187,6 +202,11 @@ def mask_cross_entropy(pred,
         >>>                           avg_factor, class_weights)
         >>> assert loss.shape == (1,)
     """
+
+    label_dict_conversion = kwargs['label_dict_conversion']
+    for i, el in enumerate(label):
+        label[i] = label_dict_conversion[el.item()]['bottletype']
+
     assert ignore_index is None, 'BCE loss does not support ignore_index'
     # TODO: handle these two reserved arguments
     assert reduction == 'mean' and avg_factor is None

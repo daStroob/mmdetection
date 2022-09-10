@@ -161,7 +161,7 @@ class BBoxHead(BaseModule):
         # now use empty & fill because BG cat_id = num_classes,
         # FG cat_id = [0, num_classes-1]
         labels = pos_bboxes.new_full((num_samples, ),
-                                     self.num_classes,
+                                     -1,
                                      dtype=torch.long)
         label_weights = pos_bboxes.new_zeros(num_samples)
         bbox_targets = pos_bboxes.new_zeros(num_samples, 4)
@@ -262,7 +262,8 @@ class BBoxHead(BaseModule):
              label_weights,
              bbox_targets,
              bbox_weights,
-             reduction_override=None):
+             reduction_override=None,
+             **kwargs):
         losses = dict()
         if cls_score is not None:
             avg_factor = max(torch.sum(label_weights > 0).float().item(), 1.)
@@ -272,7 +273,8 @@ class BBoxHead(BaseModule):
                     labels,
                     label_weights,
                     avg_factor=avg_factor,
-                    reduction_override=reduction_override)
+                    reduction_override=reduction_override,
+                    **kwargs)
                 if isinstance(loss_cls_, dict):
                     losses.update(loss_cls_)
                 else:
@@ -352,6 +354,18 @@ class BBoxHead(BaseModule):
         else:
             scores = F.softmax(
                 cls_score, dim=-1) if cls_score is not None else None
+            scores = torch.cat((torch.sum(scores[:, 0:-1], dim=1, keepdim=True), scores[:, -1:]), 1)
+            
+        scores_classes = []
+        scores_classes.append(scores)
+        scores_classes.append(F.softmax(cls_score[:,0:5], dim=-1) if cls_score is not None else None)
+        scores_classes.append(F.softmax(cls_score[:,5:9], dim=-1) if cls_score is not None else None)
+
+        labels = []
+        labels.append(torch.argmax(scores_classes[0], dim=1, keepdim=False))
+        labels.append(torch.argmax(scores_classes[1], dim=1, keepdim=False))
+        labels.append(torch.argmax(scores_classes[2], dim=1, keepdim=False))
+        
         # bbox_pred would be None in some detector when with_reg is False,
         # e.g. Grid R-CNN.
         if bbox_pred is not None:
@@ -371,10 +385,13 @@ class BBoxHead(BaseModule):
         if cfg is None:
             return bboxes, scores
         else:
-            det_bboxes, det_labels = multiclass_nms(bboxes, scores,
+            det_bboxes, det_labels, det_inds = multiclass_nms(bboxes, scores,
                                                     cfg.score_thr, cfg.nms,
-                                                    cfg.max_per_img)
+                                                    cfg.max_per_img, return_inds=True)
 
+            det_labels = []
+            for label in labels:
+                det_labels.append(label[det_inds])
             return det_bboxes, det_labels
 
     @force_fp32(apply_to=('bbox_preds', ))

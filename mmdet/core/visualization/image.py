@@ -119,7 +119,8 @@ def draw_labels(ax,
                 color='w',
                 font_size=8,
                 scales=None,
-                horizontal_alignment='left'):
+                horizontal_alignment='left',
+                class_names_conversion=None):
     """Draw labels on the axes.
 
     Args:
@@ -137,9 +138,8 @@ def draw_labels(ax,
     Returns:
         matplotlib.Axes: The result axes.
     """
-    for i, (pos, label) in enumerate(zip(positions, labels)):
-        label_text = class_names[
-            label] if class_names is not None else f'class {label}'
+    for i, pos in enumerate(positions):
+        label_text = class_names_conversion['bottletype'][labels[1][i]] + ', ' + class_names_conversion['material'][labels[2][i]]
         if scores is not None:
             label_text += f'|{scores[i]:.02f}'
         text_color = color[i] if isinstance(color, list) else color
@@ -219,7 +219,8 @@ def imshow_det_bboxes(img,
                       win_name='',
                       show=True,
                       wait_time=0,
-                      out_file=None):
+                      out_file=None,
+                      class_names_conversion=None):
     """Draw bboxes and class labels (with scores) on an image.
 
     Args:
@@ -253,13 +254,13 @@ def imshow_det_bboxes(img,
     """
     assert bboxes is None or bboxes.ndim == 2, \
         f' bboxes ndim should be 2, but its ndim is {bboxes.ndim}.'
-    assert labels.ndim == 1, \
+    assert labels[0].ndim == 1, \
         f' labels ndim should be 1, but its ndim is {labels.ndim}.'
     assert bboxes is None or bboxes.shape[1] == 4 or bboxes.shape[1] == 5, \
         f' bboxes.shape[1] should be 4 or 5, but its {bboxes.shape[1]}.'
-    assert bboxes is None or bboxes.shape[0] <= labels.shape[0], \
+    assert bboxes is None or bboxes.shape[0] <= labels[0].shape[0], \
         'labels.shape[0] should not be less than bboxes.shape[0].'
-    assert segms is None or segms.shape[0] == labels.shape[0], \
+    assert segms is None or segms.shape[0] == labels[0].shape[0], \
         'segms.shape[0] and labels.shape[0] should have the same length.'
     assert segms is not None or bboxes is not None, \
         'segms and bboxes should not be None at the same time.'
@@ -271,7 +272,8 @@ def imshow_det_bboxes(img,
         scores = bboxes[:, -1]
         inds = scores > score_thr
         bboxes = bboxes[inds, :]
-        labels = labels[inds]
+        for i, label in enumerate(labels):
+            labels[i] = label[inds]
         if segms is not None:
             segms = segms[inds, ...]
 
@@ -292,15 +294,15 @@ def imshow_det_bboxes(img,
     ax = plt.gca()
     ax.axis('off')
 
-    max_label = int(max(labels) if len(labels) > 0 else 0)
+    max_label = int(max(labels[0]) if len(labels[0]) > 0 else 0)
     text_palette = palette_val(get_palette(text_color, max_label + 1))
-    text_colors = [text_palette[label] for label in labels]
+    text_colors = [text_palette[label] for label in labels[0]]
 
     num_bboxes = 0
     if bboxes is not None:
         num_bboxes = bboxes.shape[0]
         bbox_palette = palette_val(get_palette(bbox_color, max_label + 1))
-        colors = [bbox_palette[label] for label in labels[:num_bboxes]]
+        colors = [bbox_palette[label] for label in labels[0][:num_bboxes]]
         draw_bboxes(ax, bboxes, colors, alpha=0.8, thickness=thickness)
 
         horizontal_alignment = 'left'
@@ -310,20 +312,21 @@ def imshow_det_bboxes(img,
         scores = bboxes[:, 4] if bboxes.shape[1] == 5 else None
         draw_labels(
             ax,
-            labels[:num_bboxes],
+            labels,
             positions,
             scores=scores,
             class_names=class_names,
             color=text_colors,
             font_size=font_size,
             scales=scales,
-            horizontal_alignment=horizontal_alignment)
+            horizontal_alignment=horizontal_alignment,
+            class_names_conversion=class_names_conversion)
 
     if segms is not None:
         mask_palette = get_palette(mask_color, max_label + 1)
-        colors = [mask_palette[label] for label in labels]
+        colors = [mask_palette[label] for label in labels[0]]
         colors = np.array(colors, dtype=np.uint8)
-        draw_masks(ax, img, segms, colors, with_edge=True)
+        draw_masks(ax, img, segms, colors, with_edge=True, alpha=0.4)
 
         if num_bboxes < segms.shape[0]:
             segms = segms[num_bboxes:]
@@ -340,13 +343,14 @@ def imshow_det_bboxes(img,
             scales = _get_adaptive_scales(areas)
             draw_labels(
                 ax,
-                labels[num_bboxes:],
+                labels,
                 positions,
                 class_names=class_names,
                 color=text_colors,
                 font_size=font_size,
                 scales=scales,
-                horizontal_alignment=horizontal_alignment)
+                horizontal_alignment=horizontal_alignment,
+                class_names_conversion=class_names_conversion)
 
     plt.imshow(img)
 

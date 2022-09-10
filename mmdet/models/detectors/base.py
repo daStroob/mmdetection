@@ -169,7 +169,8 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
             return self.onnx_export(img[0], img_metas[0])
 
         if return_loss:
-            return self.forward_train(img, img_metas, **kwargs)
+            loss = self.forward_train(img, img_metas, **kwargs)
+            return loss
         else:
             return self.forward_test(img, img_metas, **kwargs)
 
@@ -218,7 +219,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
 
         return loss, log_vars
 
-    def train_step(self, data, optimizer):
+    def train_step(self, data, optimizer, **kwargs):
         """The iteration step during training.
 
         This method defines an iteration step during training, except for the
@@ -245,7 +246,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                   DDP, it means the batch size on each GPU), which is used for
                   averaging the logs.
         """
-        losses = self(**data)
+        losses = self(**data, **kwargs)
         loss, log_vars = self._parse_losses(losses)
 
         outputs = dict(
@@ -280,7 +281,8 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                     win_name='',
                     show=False,
                     wait_time=0,
-                    out_file=None):
+                    out_file=None,
+                    class_names=None):
         """Draw `result` over `img`.
 
         Args:
@@ -312,20 +314,16 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         img = mmcv.imread(img)
         img = img.copy()
         if isinstance(result, tuple):
-            bbox_result, segm_result = result
+            bbox_result, segm_result, label_result = result
             if isinstance(segm_result, tuple):
                 segm_result = segm_result[0]  # ms rcnn
         else:
-            bbox_result, segm_result = result, None
+            bbox_result, segm_result, label_result = result, None
         bboxes = np.vstack(bbox_result)
-        labels = [
-            np.full(bbox.shape[0], i, dtype=np.int32)
-            for i, bbox in enumerate(bbox_result)
-        ]
-        labels = np.concatenate(labels)
+    
         # draw segmentation masks
         segms = None
-        if segm_result is not None and len(labels) > 0:  # non empty
+        if segm_result is not None and len(label_result[0]) > 0:  # non empty
             segms = mmcv.concat_list(segm_result)
             if isinstance(segms[0], torch.Tensor):
                 segms = torch.stack(segms, dim=0).detach().cpu().numpy()
@@ -338,7 +336,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         img = imshow_det_bboxes(
             img,
             bboxes,
-            labels,
+            label_result,
             segms,
             class_names=self.CLASSES,
             score_thr=score_thr,
@@ -350,7 +348,8 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
             win_name=win_name,
             show=show,
             wait_time=wait_time,
-            out_file=out_file)
+            out_file=out_file,
+            class_names_conversion=class_names)
 
         if not (show or out_file):
             return img

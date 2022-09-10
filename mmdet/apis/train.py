@@ -121,7 +121,8 @@ def train_detector(model,
                    distributed=False,
                    validate=False,
                    timestamp=None,
-                   meta=None):
+                   meta=None,
+                   multilist_dataset=None):
 
     cfg = compat_cfg(cfg)
     logger = get_root_logger(log_level=cfg.log_level)
@@ -148,6 +149,10 @@ def train_detector(model,
     }
 
     data_loaders = [build_dataloader(ds, **train_loader_cfg) for ds in dataset]
+    multilist_data_loader = None
+    if not multilist_dataset == None:
+        multilist_data_loader = build_dataloader(multilist_dataset, **train_loader_cfg)
+    label_dict_conversion = cfg.label_dict_conversion
 
     # put model on gpus
     if distributed:
@@ -230,7 +235,7 @@ def train_detector(model,
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         runner.register_hook(
-            eval_hook(val_dataloader, **eval_cfg), priority='LOW')
+            eval_hook(val_dataloader, **eval_cfg, label_dict_conversion=label_dict_conversion), priority='LOW')
 
         if hasattr(cfg.data, 'multi_val'):
             for key, val_dataset in cfg.data.multi_val.items():
@@ -259,4 +264,4 @@ def train_detector(model,
         runner.resume(cfg.resume_from)
     elif cfg.load_from:
         runner.load_checkpoint(cfg.load_from)
-    runner.run(data_loaders, cfg.workflow)
+    runner.run(data_loaders, cfg.workflow, multilist_data_loader=multilist_data_loader, label_dict_conversion=label_dict_conversion)

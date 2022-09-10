@@ -56,7 +56,8 @@ class FCNMaskHead(BaseModule):
         self.conv_out_channels = conv_out_channels
         self.upsample_method = self.upsample_cfg.get('type')
         self.scale_factor = self.upsample_cfg.pop('scale_factor', None)
-        self.num_classes = num_classes
+        #self.num_classes = num_classes
+        self.num_classes = 5
         self.class_agnostic = class_agnostic
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
@@ -145,7 +146,7 @@ class FCNMaskHead(BaseModule):
         return mask_targets
 
     @force_fp32(apply_to=('mask_pred', ))
-    def loss(self, mask_pred, mask_targets, labels):
+    def loss(self, mask_pred, mask_targets, labels, **kwargs):
         """
         Example:
             >>> from mmdet.models.roi_heads.mask_heads.fcn_mask_head import *  # NOQA
@@ -172,7 +173,7 @@ class FCNMaskHead(BaseModule):
                 loss_mask = self.loss_mask(mask_pred, mask_targets,
                                            torch.zeros_like(labels))
             else:
-                loss_mask = self.loss_mask(mask_pred, mask_targets, labels)
+                loss_mask = self.loss_mask(mask_pred, mask_targets, labels, **kwargs)
         loss['loss_mask'] = loss_mask
         return loss
 
@@ -285,9 +286,8 @@ class FCNMaskHead(BaseModule):
             img_w,
             device=device,
             dtype=torch.bool if threshold >= 0 else torch.uint8)
-
         if not self.class_agnostic:
-            mask_pred = mask_pred[range(N), labels][:, None]
+            mask_pred = mask_pred[range(N), labels[1]][:, None]
 
         for inds in chunks:
             masks_chunk, spatial_inds = _do_paste_mask(
@@ -306,7 +306,9 @@ class FCNMaskHead(BaseModule):
             im_mask[(inds, ) + spatial_inds] = masks_chunk
 
         for i in range(N):
-            cls_segms[labels[i]].append(im_mask[i].detach().cpu().numpy())
+            # ------------------------- MAYBE CHANGE LABEL CLASS HERE ------------------------------
+            #cls_segms[labels[1][i]].append(im_mask[i].detach().cpu().numpy())
+            cls_segms[0].append(im_mask[i].detach().cpu().numpy())
         return cls_segms
 
     def onnx_export(self, mask_pred, det_bboxes, det_labels, rcnn_test_cfg,
