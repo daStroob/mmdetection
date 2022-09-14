@@ -322,7 +322,8 @@ class BBoxHead(BaseModule):
                    img_shape,
                    scale_factor,
                    rescale=False,
-                   cfg=None):
+                   cfg=None,
+                   **kwargs):
         """Transform network output for a batch into bbox predictions.
 
         Args:
@@ -347,24 +348,38 @@ class BBoxHead(BaseModule):
                 dimension 5 represent (tl_x, tl_y, br_x, br_y, score).
                 Second tensor is the labels with shape (num_boxes, ).
         """
+        label_conversion_dict = kwargs['label_conversion_dict']
 
         # some loss (Seesaw loss..) may have custom activation
-        if self.custom_cls_channels:
-            scores = self.loss_cls.get_activation(cls_score)
-        else:
-            scores = F.softmax(
-                cls_score, dim=-1) if cls_score is not None else None
-            scores = torch.cat((torch.sum(scores[:, 0:-1], dim=1, keepdim=True), scores[:, -1:]), 1)
+        #if self.custom_cls_channels:
+        #    scores = self.loss_cls.get_activation(cls_score)
+        #else:
+        #    scores = F.softmax(
+        #        cls_score, dim=-1) if cls_score is not None else None
+        #    scores = torch.cat((torch.sum(scores[:, 0:-1], dim=1, keepdim=True), scores[:, -1:]), 1)
             
         scores_classes = []
-        scores_classes.append(scores)
-        scores_classes.append(F.softmax(cls_score[:,0:5], dim=-1) if cls_score is not None else None)
-        scores_classes.append(F.softmax(cls_score[:,5:9], dim=-1) if cls_score is not None else None)
-
         labels = []
-        labels.append(torch.argmax(scores_classes[0], dim=1, keepdim=False))
-        labels.append(torch.argmax(scores_classes[1], dim=1, keepdim=False))
-        labels.append(torch.argmax(scores_classes[2], dim=1, keepdim=False))
+        start_index = 0
+        for category in label_conversion_dict['categories']:
+            is_shape_category = (label_conversion_dict['shape_category'] == category)
+
+            n_classes = len(label_conversion_dict['class_names'][category])
+            cat_score = cls_score[:, start_index:(start_index + n_classes)]
+            if is_shape_category:
+                cat_score = torch.cat((cat_score, cls_score[:, -1:]), 1)
+
+            cat_score_softmax = F.softmax(cat_score, dim=-1)
+            if is_shape_category:
+                scores = torch.cat((torch.sum(cat_score_softmax[:, 0:-1], dim=1, keepdim=True), cat_score_softmax[:, -1:]), 1)
+                scores_classes.append(scores)
+                labels.append(torch.argmax(scores, dim=1, keepdim=False))
+
+                #remove this next line after fixed!
+                cat_score_softmax = cat_score_softmax[:, :-1]
+            scores_classes.append(cat_score_softmax)
+            labels.append(torch.argmax(cat_score_softmax, dim=1, keepdim=False))
+            start_index += n_classes
         
         # bbox_pred would be None in some detector when with_reg is False,
         # e.g. Grid R-CNN.
@@ -392,6 +407,12 @@ class BBoxHead(BaseModule):
             det_labels = []
             for label in labels:
                 det_labels.append(label[det_inds])
+
+            print('')
+            print('bboxes: ', bboxes.shape)
+            print('det_bboxes: ', det_bboxes.shape)
+            print('scores: ', scores.shape)
+            print(scores)
             return det_bboxes, det_labels
 
     @force_fp32(apply_to=('bbox_preds', ))

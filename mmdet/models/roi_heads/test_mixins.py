@@ -53,7 +53,8 @@ class BBoxTestMixin:
                            img_metas,
                            proposals,
                            rcnn_test_cfg,
-                           rescale=False):
+                           rescale=False,
+                           **kwargs):
         """Test only det bboxes without augmentation.
 
         Args:
@@ -130,7 +131,8 @@ class BBoxTestMixin:
                     img_shapes[i],
                     scale_factors[i],
                     rescale=rescale,
-                    cfg=rcnn_test_cfg)
+                    cfg=rcnn_test_cfg,
+                    **kwargs)
             det_bboxes.append(det_bbox)
             det_labels.append(det_label)
         return det_bboxes, det_labels

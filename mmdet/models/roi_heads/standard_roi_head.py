@@ -228,7 +228,8 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
                     proposal_list,
                     img_metas,
                     proposals=None,
-                    rescale=False):
+                    rescale=False,
+                    **kwargs):
         """Test without augmentation.
 
         Args:
@@ -254,7 +255,7 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
         assert self.with_bbox, 'Bbox head must be implemented.'
 
         det_bboxes, det_labels = self.simple_test_bboxes(
-            x, img_metas, proposal_list, self.test_cfg, rescale=rescale)
+            x, img_metas, proposal_list, self.test_cfg, rescale=rescale, **kwargs)
 
         bbox_results = [
             bbox2result(det_bboxes[i], det_labels[i][0], 2)
@@ -264,6 +265,8 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
         if not self.with_mask:
             return bbox_results
         else:
+            label_conversion_dict = kwargs['label_conversion_dict']
+
             segm_results = self.simple_test_mask(
                 x, img_metas, det_bboxes, det_labels, rescale=rescale)
 

@@ -40,33 +40,47 @@ def cross_entropy(pred,
     # The default value of ignore_index is the same as F.cross_entropy
     ignore_index = -100 if ignore_index is None else ignore_index
     # element-wise losses
-    label_dict_conversion = kwargs['label_dict_conversion']
+    label_conversion_dict = kwargs['label_conversion_dict']
 
-    label_new = torch.zeros(pred.shape).cuda()
-    for index, obj_label in enumerate(label):
-        gt_labels = [0]*10
-        if obj_label.item() == -1:
-            label_new[index, 9] = 1
-            gt_labels[9] = 1
-        else:
-            for category in label_dict_conversion[obj_label.item()].values():
-                label_new[index, category] = 1
-                gt_labels[category] = 1
-    label = label_new
+    torch.set_printoptions(threshold=10000)
+    losses = []
+    start_index = 0
+    for category in label_conversion_dict['categories']:
+        is_shape_category = (label_conversion_dict['shape_category'] == category)
 
-    loss = F.cross_entropy(
-        pred,
-        label,
-        weight=class_weight,
-        reduction='none',
-        ignore_index=ignore_index)
+        n_classes = len(label_conversion_dict['class_names'][category])
+        cat_pred = pred[:, start_index:(start_index + n_classes)]
+        if is_shape_category:
+            cat_pred = torch.cat((cat_pred, pred[:, -1:]), 1)
+
+        cat_label = torch.zeros(label.shape, dtype=label.dtype).cuda()
+        for index, obj_label in enumerate(label):
+            if obj_label == -1:
+                if is_shape_category:
+                    cat_label[index] = n_classes
+                else:
+                    cat_label[index] = 0
+            else:
+                cat_label[index] = label_conversion_dict['conversion_ids'][obj_label.item()][category]
+        
+        losses.append(
+            F.cross_entropy(
+            cat_pred,
+            cat_label,
+            weight=class_weight,
+            reduction='none',
+            ignore_index=ignore_index)
+        )
+        start_index += n_classes
+    loss = torch.zeros(losses[0].shape, dtype=losses[0].dtype).cuda()
+    for cat_loss in losses:
+        loss = torch.add(loss, cat_loss)
 
     # average loss over non-ignored elements
     # pytorch's official cross_entropy average loss over non-ignored elements
     # refer to https://github.com/pytorch/pytorch/blob/56b43f4fec1f76953f15a627694d4bba34588969/torch/nn/functional.py#L2660  # noqa
     if (avg_factor is None) and avg_non_ignore and reduction == 'mean':
         avg_factor = label.numel() - (label == ignore_index).sum().item()
-
     # apply weights and do the reduction
     if weight is not None:
         weight = weight.float()
@@ -203,9 +217,10 @@ def mask_cross_entropy(pred,
         >>> assert loss.shape == (1,)
     """
 
-    label_dict_conversion = kwargs['label_dict_conversion']
+    label_conversion_dict = kwargs['label_conversion_dict']
+    shape_category = label_conversion_dict['shape_category']
     for i, el in enumerate(label):
-        label[i] = label_dict_conversion[el.item()]['bottletype']
+        label[i] = label_conversion_dict['conversion_ids'][el.item()][shape_category]
 
     assert ignore_index is None, 'BCE loss does not support ignore_index'
     # TODO: handle these two reserved arguments

@@ -19,7 +19,7 @@ def single_gpu_test(model,
                     show=False,
                     out_dir=None,
                     show_score_thr=0.3,
-                    class_names=None):
+                    label_conversion_dict=None):
     model.eval()
     results = []
     dataset = data_loader.dataset
@@ -27,7 +27,7 @@ def single_gpu_test(model,
     prog_bar = mmcv.ProgressBar(len(dataset))
     for i, data in enumerate(data_loader):
         with torch.no_grad():
-            result = model(return_loss=False, rescale=True, **data)
+            result = model(return_loss=False, rescale=True, **data, label_conversion_dict=label_conversion_dict)
 
         batch_size = len(result)
         if show or out_dir:
@@ -60,7 +60,7 @@ def single_gpu_test(model,
                     show=show,
                     out_file=out_file,
                     score_thr=show_score_thr,
-                    class_names=class_names)
+                    class_names=label_conversion_dict['class_names'])
 
         # encode mask results
         if isinstance(result[0], tuple):

@@ -232,12 +232,12 @@ def main():
         model.CLASSES = checkpoint['meta']['CLASSES']
     else:
         model.CLASSES = dataset.CLASSES
-    class_names = cfg.class_names
+    label_conversion_dict = cfg.label_conversion_dict
 
     if not distributed:
         model = build_dp(model, cfg.device, device_ids=cfg.gpu_ids)
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir,
-                                  args.show_score_thr, class_names=class_names)
+                                  args.show_score_thr, label_conversion_dict=label_conversion_dict)
     else:
         model = build_ddp(
             model,

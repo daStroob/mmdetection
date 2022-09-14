@@ -56,8 +56,7 @@ class FCNMaskHead(BaseModule):
         self.conv_out_channels = conv_out_channels
         self.upsample_method = self.upsample_cfg.get('type')
         self.scale_factor = self.upsample_cfg.pop('scale_factor', None)
-        #self.num_classes = num_classes
-        self.num_classes = 5
+        self.num_classes = num_classes
         self.class_agnostic = class_agnostic
         self.conv_cfg = conv_cfg
         self.norm_cfg = norm_cfg
@@ -287,6 +286,7 @@ class FCNMaskHead(BaseModule):
             device=device,
             dtype=torch.bool if threshold >= 0 else torch.uint8)
         if not self.class_agnostic:
+            #make dependend on chosen category!
             mask_pred = mask_pred[range(N), labels[1]][:, None]
 
         for inds in chunks:

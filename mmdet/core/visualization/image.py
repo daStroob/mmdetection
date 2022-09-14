@@ -139,7 +139,11 @@ def draw_labels(ax,
         matplotlib.Axes: The result axes.
     """
     for i, pos in enumerate(positions):
-        label_text = class_names_conversion['bottletype'][labels[1][i]] + ', ' + class_names_conversion['material'][labels[2][i]]
+        label_text = ''
+        for index, category in enumerate(class_names_conversion):
+            if index > 0:
+                label_text += ', '
+            label_text += class_names_conversion[category][labels[index+1][i]]
         if scores is not None:
             label_text += f'|{scores[i]:.02f}'
         text_color = color[i] if isinstance(color, list) else color
