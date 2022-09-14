@@ -8,17 +8,16 @@ import torch.nn.functional as F
 from ..builder import LOSSES
 from .utils import weight_reduce_loss
 
-
-def cross_entropy(pred,
-                  label,
-                  weight=None,
-                  reduction='mean',
-                  avg_factor=None,
-                  class_weight=None,
-                  ignore_index=-100,
-                  avg_non_ignore=False,
-                  **kwargs):
-    """Calculate the CrossEntropy loss.
+def multi_category_cross_entropy(pred,
+                                label,
+                                weight=None,
+                                reduction='mean',
+                                avg_factor=None,
+                                class_weight=None,
+                                ignore_index=-100,
+                                avg_non_ignore=False,
+                                **kwargs):
+    """Calculate the CrossEntropy loss for different class categories.
 
     Args:
         pred (torch.Tensor): The prediction with shape (N, C), C is the number
@@ -81,6 +80,58 @@ def cross_entropy(pred,
     # refer to https://github.com/pytorch/pytorch/blob/56b43f4fec1f76953f15a627694d4bba34588969/torch/nn/functional.py#L2660  # noqa
     if (avg_factor is None) and avg_non_ignore and reduction == 'mean':
         avg_factor = label.numel() - (label == ignore_index).sum().item()
+    # apply weights and do the reduction
+    if weight is not None:
+        weight = weight.float()
+    loss = weight_reduce_loss(
+        loss, weight=weight, reduction=reduction, avg_factor=avg_factor)
+
+    return loss
+
+
+def cross_entropy(pred,
+                  label,
+                  weight=None,
+                  reduction='mean',
+                  avg_factor=None,
+                  class_weight=None,
+                  ignore_index=-100,
+                  avg_non_ignore=False):
+    """Calculate the CrossEntropy loss.
+
+    Args:
+        pred (torch.Tensor): The prediction with shape (N, C), C is the number
+            of classes.
+        label (torch.Tensor): The learning label of the prediction.
+        weight (torch.Tensor, optional): Sample-wise loss weight.
+        reduction (str, optional): The method used to reduce the loss.
+        avg_factor (int, optional): Average factor that is used to average
+            the loss. Defaults to None.
+        class_weight (list[float], optional): The weight for each class.
+        ignore_index (int | None): The label index to be ignored.
+            If None, it will be set to default value. Default: -100.
+        avg_non_ignore (bool): The flag decides to whether the loss is
+            only averaged over non-ignored targets. Default: False.
+
+    Returns:
+        torch.Tensor: The calculated loss
+    """
+    # The default value of ignore_index is the same as F.cross_entropy
+    ignore_index = -100 if ignore_index is None else ignore_index
+    # element-wise losses
+    loss = F.cross_entropy(
+        pred,
+        label,
+        weight=class_weight,
+        reduction='none',
+        ignore_index=ignore_index)
+
+    # average loss over non-ignored elements
+    # pytorch's official cross_entropy average loss over non-ignored elements
+    # refer to https://github.com/pytorch/pytorch/blob/56b43f4fec1f76953f15a627694d4bba34588969/torch/nn/functional.py#L2660  # noqa
+    if (avg_factor is None) and avg_non_ignore and reduction == 'mean':
+        avg_factor = label.numel() - (label == ignore_index).sum().item()
+
     # apply weights and do the reduction
     if weight is not None:
         weight = weight.float()
@@ -238,6 +289,7 @@ class CrossEntropyLoss(nn.Module):
     def __init__(self,
                  use_sigmoid=False,
                  use_mask=False,
+                 multiple_class_categories=False,
                  reduction='mean',
                  class_weight=None,
                  ignore_index=None,
@@ -264,6 +316,7 @@ class CrossEntropyLoss(nn.Module):
         assert (use_sigmoid is False) or (use_mask is False)
         self.use_sigmoid = use_sigmoid
         self.use_mask = use_mask
+        self.multiple_class_categories = multiple_class_categories
         self.reduction = reduction
         self.loss_weight = loss_weight
         self.class_weight = class_weight
@@ -281,6 +334,8 @@ class CrossEntropyLoss(nn.Module):
             self.cls_criterion = binary_cross_entropy
         elif self.use_mask:
             self.cls_criterion = mask_cross_entropy
+        elif self.multiple_class_categories:
+            self.cls_criterion = multi_category_cross_entropy
         else:
             self.cls_criterion = cross_entropy
 

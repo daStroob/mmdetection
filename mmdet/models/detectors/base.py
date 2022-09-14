@@ -246,7 +246,8 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                   DDP, it means the batch size on each GPU), which is used for
                   averaging the logs.
         """
-        losses = self(**data, **kwargs)
+        label_conversion_dict = kwargs['label_conversion_dict']
+        losses = self(**data, label_conversion_dict=label_conversion_dict)
         loss, log_vars = self._parse_losses(losses)
 
         outputs = dict(
