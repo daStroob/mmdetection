@@ -258,7 +258,7 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
             x, img_metas, proposal_list, self.test_cfg, rescale=rescale, **kwargs)
 
         bbox_results = [
-            bbox2result(det_bboxes[i], det_labels[i][0], 2)
+            bbox2result(det_bboxes[i], det_labels[i]['class-agnostic'], 2)
             for i in range(len(det_bboxes))
         ]
 
@@ -266,16 +266,18 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
             return bbox_results
         else:
             label_conversion_dict = kwargs['label_conversion_dict']
+            shape_category_det_labels = []
+            for det_label in det_labels:
+                shape_category_det_labels.append(det_label[label_conversion_dict['shape_category']])
 
             segm_results = self.simple_test_mask(
-                x, img_metas, det_bboxes, det_labels, rescale=rescale)
+                x, img_metas, det_bboxes, shape_category_det_labels, rescale=rescale)
 
             labels_results = []
             for det_label in det_labels:
-                labels_results.append([
-                    det_label_cat.detach().cpu().numpy()
-                    for det_label_cat in det_label
-                ])
+                for category, det_label_cat in det_label.items():
+                    det_label[category] = det_label_cat.detach().cpu().numpy()
+                labels_results.append(det_label)
             return list(zip(bbox_results, segm_results, labels_results))
 
     def aug_test(self, x, proposal_list, img_metas, rescale=False):

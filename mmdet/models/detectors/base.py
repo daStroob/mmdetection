@@ -282,7 +282,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
                     show=False,
                     wait_time=0,
                     out_file=None,
-                    class_names=None):
+                    label_conversion_dict=None):
         """Draw `result` over `img`.
 
         Args:
@@ -323,7 +323,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
     
         # draw segmentation masks
         segms = None
-        if segm_result is not None and len(label_result[0]) > 0:  # non empty
+        if segm_result is not None:  # non empty
             segms = mmcv.concat_list(segm_result)
             if isinstance(segms[0], torch.Tensor):
                 segms = torch.stack(segms, dim=0).detach().cpu().numpy()
@@ -349,7 +349,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
             show=show,
             wait_time=wait_time,
             out_file=out_file,
-            class_names_conversion=class_names)
+            label_conversion_dict=label_conversion_dict)
 
         if not (show or out_file):
             return img

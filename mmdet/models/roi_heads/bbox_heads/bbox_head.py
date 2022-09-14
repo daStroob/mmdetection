@@ -358,8 +358,7 @@ class BBoxHead(BaseModule):
         #        cls_score, dim=-1) if cls_score is not None else None
         #    scores = torch.cat((torch.sum(scores[:, 0:-1], dim=1, keepdim=True), scores[:, -1:]), 1)
             
-        scores_classes = []
-        labels = []
+        labels = {}
         start_index = 0
         for category in label_conversion_dict['categories']:
             is_shape_category = (label_conversion_dict['shape_category'] == category)
@@ -372,13 +371,11 @@ class BBoxHead(BaseModule):
             cat_score_softmax = F.softmax(cat_score, dim=-1)
             if is_shape_category:
                 scores = torch.cat((torch.sum(cat_score_softmax[:, 0:-1], dim=1, keepdim=True), cat_score_softmax[:, -1:]), 1)
-                scores_classes.append(scores)
-                labels.append(torch.argmax(scores, dim=1, keepdim=False))
+                labels['class-agnostic'] = torch.argmax(scores, dim=1, keepdim=False)
 
                 #remove this next line after fixed!
                 cat_score_softmax = cat_score_softmax[:, :-1]
-            scores_classes.append(cat_score_softmax)
-            labels.append(torch.argmax(cat_score_softmax, dim=1, keepdim=False))
+            labels[category] = torch.argmax(cat_score_softmax, dim=1, keepdim=False)
             start_index += n_classes
         
         # bbox_pred would be None in some detector when with_reg is False,
@@ -404,15 +401,10 @@ class BBoxHead(BaseModule):
                                                     cfg.score_thr, cfg.nms,
                                                     cfg.max_per_img, return_inds=True)
 
-            det_labels = []
-            for label in labels:
-                det_labels.append(label[det_inds])
+            det_labels = {}
+            for category, label in labels.items():
+                det_labels[category]= label[det_inds]
 
-            print('')
-            print('bboxes: ', bboxes.shape)
-            print('det_bboxes: ', det_bboxes.shape)
-            print('scores: ', scores.shape)
-            print(scores)
             return det_bboxes, det_labels
 
     @force_fp32(apply_to=('bbox_preds', ))

@@ -286,8 +286,7 @@ class FCNMaskHead(BaseModule):
             device=device,
             dtype=torch.bool if threshold >= 0 else torch.uint8)
         if not self.class_agnostic:
-            #make dependend on chosen category!
-            mask_pred = mask_pred[range(N), labels[1]][:, None]
+            mask_pred = mask_pred[range(N), labels][:, None]
 
         for inds in chunks:
             masks_chunk, spatial_inds = _do_paste_mask(

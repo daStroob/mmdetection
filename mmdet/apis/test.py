@@ -60,7 +60,7 @@ def single_gpu_test(model,
                     show=show,
                     out_file=out_file,
                     score_thr=show_score_thr,
-                    class_names=label_conversion_dict['class_names'])
+                    label_conversion_dict=label_conversion_dict)
 
         # encode mask results
         if isinstance(result[0], tuple):
