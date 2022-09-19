@@ -41,7 +41,6 @@ def multi_category_cross_entropy(pred,
     # element-wise losses
     label_conversion_dict = kwargs['label_conversion_dict']
 
-    torch.set_printoptions(threshold=10000)
     losses = []
     start_index = 0
     for category in label_conversion_dict['categories']:
@@ -267,12 +266,6 @@ def mask_cross_entropy(pred,
         >>>                           avg_factor, class_weights)
         >>> assert loss.shape == (1,)
     """
-
-    label_conversion_dict = kwargs['label_conversion_dict']
-    shape_category = label_conversion_dict['shape_category']
-    for i, el in enumerate(label):
-        label[i] = label_conversion_dict['conversion_ids'][el.item()][shape_category]
-
     assert ignore_index is None, 'BCE loss does not support ignore_index'
     # TODO: handle these two reserved arguments
     assert reduction == 'mean' and avg_factor is None

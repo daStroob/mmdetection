@@ -253,19 +253,30 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
             of tuple is bbox results, second element is mask results.
         """
         assert self.with_bbox, 'Bbox head must be implemented.'
+        label_conversion_dict = kwargs['label_conversion_dict']
 
         det_bboxes, det_labels = self.simple_test_bboxes(
             x, img_metas, proposal_list, self.test_cfg, rescale=rescale, **kwargs)
 
         bbox_results = [
-            bbox2result(det_bboxes[i], det_labels[i]['class-agnostic'], 2)
+            bbox2result(det_bboxes[i], det_labels[i][label_conversion_dict['shape_category']], self.bbox_head.num_classes)
             for i in range(len(det_bboxes))
         ]
+
+        #labels2result
+        labels_results = []
+        for det_label in det_labels:
+            multi_label_dict = {}
+            for category, det_label_cat in det_label.items():
+                multi_label_dict[category] = [
+                    det_label_cat[det_label[label_conversion_dict['shape_category']]==shape_cat_label].detach().cpu().numpy()
+                    for shape_cat_label in range(self.bbox_head.num_classes)
+                ]
+            labels_results.append(multi_label_dict)
 
         if not self.with_mask:
             return bbox_results
         else:
-            label_conversion_dict = kwargs['label_conversion_dict']
             shape_category_det_labels = []
             for det_label in det_labels:
                 shape_category_det_labels.append(det_label[label_conversion_dict['shape_category']])
@@ -273,11 +284,6 @@ class StandardRoIHead(BaseRoIHead, BBoxTestMixin, MaskTestMixin):
             segm_results = self.simple_test_mask(
                 x, img_metas, det_bboxes, shape_category_det_labels, rescale=rescale)
 
-            labels_results = []
-            for det_label in det_labels:
-                for category, det_label_cat in det_label.items():
-                    det_label[category] = det_label_cat.detach().cpu().numpy()
-                labels_results.append(det_label)
             return list(zip(bbox_results, segm_results, labels_results))
 
     def aug_test(self, x, proposal_list, img_metas, rescale=False):

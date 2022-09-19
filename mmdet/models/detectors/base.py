@@ -321,6 +321,11 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         else:
             bbox_result, segm_result, label_result = result, None
         bboxes = np.vstack(bbox_result)
+
+        #stack label results
+        labels = {}
+        for category, label_cat in label_result.items():
+            labels[category] = np.concatenate(label_cat)
     
         # draw segmentation masks
         segms = None
@@ -337,7 +342,7 @@ class BaseDetector(BaseModule, metaclass=ABCMeta):
         img = imshow_det_bboxes(
             img,
             bboxes,
-            label_result,
+            labels,
             segms,
             class_names=self.CLASSES,
             score_thr=score_thr,

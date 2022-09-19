@@ -81,9 +81,9 @@ class ConvFCBBoxHead(BBoxHead):
         # reconstruct fc_cls and fc_reg since input channels are changed
         if self.with_cls:
             if self.custom_cls_channels:
-                cls_channels = self.loss_cls.get_cls_channels(self.num_classes)
+                cls_channels = self.loss_cls.get_cls_channels(self.num_cls_classes)
             else:
-                cls_channels = self.num_classes + 1
+                cls_channels = self.num_cls_classes + 1
             self.fc_cls = build_linear_layer(
                 self.cls_predictor_cfg,
                 in_features=self.cls_last_dim,

@@ -11,7 +11,8 @@ def multiclass_nms(multi_bboxes,
                    nms_cfg,
                    max_num=-1,
                    score_factors=None,
-                   return_inds=False):
+                   return_inds=False,
+                   multi_labels=None):
     """NMS for multi-class bboxes.
 
     Args:
@@ -66,6 +67,10 @@ def multiclass_nms(multi_bboxes,
         # NonZero not supported  in TensorRT
         inds = valid_mask.nonzero(as_tuple=False).squeeze(1)
         bboxes, scores, labels = bboxes[inds], scores[inds], labels[inds]
+
+        if not multi_labels == None:
+            for category, cat_label in multi_labels.items():
+                multi_labels[category] = cat_label.repeat_interleave(num_classes)[inds]
     else:
         # TensorRT NMS plugin has invalid output filled with -1
         # add dummy data to make detection output correct.
@@ -89,10 +94,19 @@ def multiclass_nms(multi_bboxes,
         dets = dets[:max_num]
         keep = keep[:max_num]
 
-    if return_inds:
-        return dets, labels[keep], inds[keep]
+    if multi_labels == None:
+        if return_inds:
+            return dets, labels[keep], inds[keep]
+        else:
+            return dets, labels[keep]
     else:
-        return dets, labels[keep]
+        for category, cat_label in multi_labels.items():
+                multi_labels[category] = cat_label[keep]
+
+        if return_inds:
+            return dets, labels[keep], inds[keep], multi_labels
+        else:
+            return dets, labels[keep], multi_labels
 
 
 def fast_nms(multi_bboxes,

@@ -23,6 +23,7 @@ class BBoxHead(BaseModule):
                  roi_feat_size=7,
                  in_channels=256,
                  num_classes=80,
+                 num_cls_classes=None,
                  bbox_coder=dict(
                      type='DeltaXYWHBBoxCoder',
                      clip_border=True,
@@ -49,6 +50,7 @@ class BBoxHead(BaseModule):
         self.roi_feat_area = self.roi_feat_size[0] * self.roi_feat_size[1]
         self.in_channels = in_channels
         self.num_classes = num_classes
+        self.num_cls_classes = num_classes if num_cls_classes==None else num_cls_classes
         self.reg_class_agnostic = reg_class_agnostic
         self.reg_decoded_bbox = reg_decoded_bbox
         self.reg_predictor_cfg = reg_predictor_cfg
@@ -67,9 +69,9 @@ class BBoxHead(BaseModule):
         if self.with_cls:
             # need to add background class
             if self.custom_cls_channels:
-                cls_channels = self.loss_cls.get_cls_channels(self.num_classes)
+                cls_channels = self.loss_cls.get_cls_channels(self.num_cls_classes)
             else:
-                cls_channels = num_classes + 1
+                cls_channels = num_cls_classes + 1
             self.fc_cls = build_linear_layer(
                 self.cls_predictor_cfg,
                 in_features=in_channels,
@@ -286,9 +288,8 @@ class BBoxHead(BaseModule):
                 else:
                     losses['acc'] = accuracy(cls_score, labels)
         if bbox_pred is not None:
-            bg_class_ind = self.num_classes
             # 0~self.num_classes-1 are FG, self.num_classes is BG
-            pos_inds = (labels >= 0) & (labels < bg_class_ind)
+            pos_inds = labels >= 0  # background class is now labeled -1, pick all inds where not background
             # do not perform bounding box regression for BG anymore.
             if pos_inds.any():
                 if self.reg_decoded_bbox:
@@ -301,6 +302,11 @@ class BBoxHead(BaseModule):
                     pos_bbox_pred = bbox_pred.view(
                         bbox_pred.size(0), 4)[pos_inds.type(torch.bool)]
                 else:
+                    label_conversion_dict = kwargs['label_conversion_dict']
+                    shape_category = label_conversion_dict['shape_category']
+                    for index, label in enumerate(labels):
+                        if label.item() >= 0:
+                            labels[index] = label_conversion_dict['conversion_ids'][label.item()][shape_category]
                     pos_bbox_pred = bbox_pred.view(
                         bbox_pred.size(0), -1,
                         4)[pos_inds.type(torch.bool),
@@ -367,15 +373,9 @@ class BBoxHead(BaseModule):
             n_classes = len(label_conversion_dict['class_names'][category])
             cat_score = cls_score[:, start_index:(start_index + n_classes)]
             if is_shape_category:
-                cat_score = torch.cat((cat_score, cls_score[:, -1:]), 1)
+                scores = F.softmax(torch.cat((cat_score, cls_score[:, -1:]), 1), dim=-1)
 
             cat_score_softmax = F.softmax(cat_score, dim=-1)
-            if is_shape_category:
-                scores = torch.cat((torch.sum(cat_score_softmax[:, 0:-1], dim=1, keepdim=True), cat_score_softmax[:, -1:]), 1)
-                labels['class-agnostic'] = torch.argmax(scores, dim=1, keepdim=False)
-
-                #remove this next line after fixed!
-                cat_score_softmax = cat_score_softmax[:, :-1]
             labels[category] = torch.argmax(cat_score_softmax, dim=1, keepdim=False)
             start_index += n_classes
         
@@ -398,15 +398,12 @@ class BBoxHead(BaseModule):
         if cfg is None:
             return bboxes, scores
         else:
-            det_bboxes, det_labels, det_inds = multiclass_nms(bboxes, scores,
+            det_bboxes, det_labels, det_multi_labels = multiclass_nms(bboxes, scores,
                                                     cfg.score_thr, cfg.nms,
-                                                    cfg.max_per_img, return_inds=True)
+                                                    cfg.max_per_img, return_inds=False, multi_labels=labels)
+            det_multi_labels[label_conversion_dict['shape_category']] = det_labels
 
-            det_labels = {}
-            for category, label in labels.items():
-                det_labels[category]= label[det_inds]
-
-            return det_bboxes, det_labels
+            return det_bboxes, det_multi_labels
 
     @force_fp32(apply_to=('bbox_preds', ))
     def refine_bboxes(self, rois, labels, bbox_preds, pos_is_gts, img_metas):

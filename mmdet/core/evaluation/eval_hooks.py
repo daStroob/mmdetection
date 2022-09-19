@@ -107,7 +107,7 @@ class EvalHook(BaseEvalHook):
 
         # Changed results to self.results so that MMDetWandbHook can access
         # the evaluation results and log them to wandb.
-        results = single_gpu_test(runner.model, self.dataloader, show=False)
+        results = single_gpu_test(runner.model, self.dataloader, show=False, label_conversion_dict=self.label_conversion_dict)
         self.latest_results = results
         runner.log_buffer.output['eval_iter_num'] = len(self.dataloader)
         key_score = self.evaluate(runner, results)

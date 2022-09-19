@@ -234,8 +234,10 @@ def train_detector(model,
         eval_hook = DistEvalHook if distributed else EvalHook
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
-        runner.register_hook(
-            eval_hook(val_dataloader, **eval_cfg, label_conversion_dict=label_conversion_dict), priority='LOW')
+
+        # ------- temp disable, turn back on once fixed for multi-label!
+        #runner.register_hook(
+        #    eval_hook(val_dataloader, **eval_cfg, label_conversion_dict=label_conversion_dict), priority='LOW')
 
         if hasattr(cfg.data, 'multi_val'):
             for key, val_dataset in cfg.data.multi_val.items():
