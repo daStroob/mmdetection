@@ -57,7 +57,7 @@ class COCOMultilabeleval:
     # Data, paper, and tutorials available at:  http://mscoco.org/
     # Code written by Piotr Dollar and Tsung-Yi Lin, 2015.
     # Licensed under the Simplified BSD License [see coco/license.txt]
-    def __init__(self, cocoGt=None, cocoDt=None, iouType='segm', label_conversion_dict=None):
+    def __init__(self, cocoGt=None, cocoDt=None, iouType='segm', label_conversion_dict=None, label_category=None):
         '''
         Initialize CocoEval using coco APIs for gt and dt
         :param cocoGt: coco object with ground truth annotations
@@ -77,6 +77,9 @@ class COCOMultilabeleval:
         self.stats = []                     # result summarization
         self.ious = {}                      # ious between all gts and dts
         self.label_conversion_dict = label_conversion_dict
+        if label_category == None:
+            label_category = label_conversion_dict['shape_category']
+        self.label_category = label_category
         if not cocoGt is None:
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
@@ -98,7 +101,7 @@ class COCOMultilabeleval:
             gts=copy.deepcopy(gts)
             for gt in gts:
                 obj_index = self.label_conversion_dict['classes_keys'].index(str(gt['category_id']).zfill(5))
-                gt['category_id'] = self.label_conversion_dict['conversion_ids'][obj_index][self.label_conversion_dict['shape_category']]
+                gt['category_id'] = self.label_conversion_dict['conversion_ids'][obj_index][self.label_category]
 
             dts=self.cocoDt.loadAnns(self.cocoDt.getAnnIds(imgIds=p.imgIds, catIds=p.catIds))
         else:

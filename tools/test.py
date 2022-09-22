@@ -265,7 +265,9 @@ def main():
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            metric = dataset.evaluate(outputs, **eval_kwargs)
+            metric = {}
+            for label_category in label_conversion_dict['categories']:
+                metric[label_category] = dataset.evaluate(outputs, label_category=label_category, **eval_kwargs)
             print(metric)
             metric_dict = dict(config=args.config, metric=metric)
             if args.work_dir is not None and rank == 0:

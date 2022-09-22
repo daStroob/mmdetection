@@ -254,13 +254,29 @@ class CocoDataset(CustomDataset):
                     json_results.append(data)
         return json_results
 
-    def _segm2json(self, results):
+    def _segm2json(self, results, label_category=None):
         """Convert instance segmentation results to COCO json style."""
         bbox_json_results = []
         segm_json_results = []
         for idx in range(len(self)):
             img_id = self.img_ids[idx]
-            det, seg = results[idx]
+            det, seg, res_labels = results[idx]
+            if not label_category == None:
+                det_relabeled = []
+                seg_relabeled = []
+                for relabel_category_index, relabel_category in enumerate(self.label_conversion_dict['class_names'][label_category]):
+                    category_bboxes = []
+                    category_segs = []
+                    for i in range(len(det)):
+                        for j in range(len(det[i])):
+                            if res_labels[label_category][i][j] == relabel_category_index:
+                                category_bboxes.append(det[i][j])
+                                category_segs.append(seg[i][j])
+                    det_relabeled.append(np.array(category_bboxes))
+                    seg_relabeled.append(category_segs)
+                det = det_relabeled
+                seg = seg_relabeled
+
             for label in range(len(det)):
                 # bbox results
                 bboxes = det[label]
@@ -292,7 +308,7 @@ class CocoDataset(CustomDataset):
                     segm_json_results.append(data)
         return bbox_json_results, segm_json_results
 
-    def results2json(self, results, outfile_prefix):
+    def results2json(self, results, outfile_prefix, label_category=None):
         """Dump the detection results to a COCO style json file.
 
         There are 3 types of results: proposals, bbox predictions, mask
@@ -318,7 +334,7 @@ class CocoDataset(CustomDataset):
             result_files['proposal'] = f'{outfile_prefix}.bbox.json'
             mmcv.dump(json_results, result_files['bbox'])
         elif isinstance(results[0], tuple):
-            json_results = self._segm2json(results)
+            json_results = self._segm2json(results, label_category=label_category)
             result_files['bbox'] = f'{outfile_prefix}.bbox.json'
             result_files['proposal'] = f'{outfile_prefix}.bbox.json'
             result_files['segm'] = f'{outfile_prefix}.segm.json'
@@ -356,7 +372,7 @@ class CocoDataset(CustomDataset):
         ar = recalls.mean(axis=1)
         return ar
 
-    def format_results(self, results, jsonfile_prefix=None, **kwargs):
+    def format_results(self, results, jsonfile_prefix=None, label_category=None, **kwargs):
         """Format the results to json (standard format for COCO evaluation).
 
         Args:
@@ -381,7 +397,7 @@ class CocoDataset(CustomDataset):
             jsonfile_prefix = osp.join(tmp_dir.name, 'results')
         else:
             tmp_dir = None
-        result_files = self.results2json(results, jsonfile_prefix)
+        result_files = self.results2json(results, jsonfile_prefix, label_category=label_category)
         return result_files, tmp_dir
 
     def evaluate_det_segm(self,
@@ -393,7 +409,8 @@ class CocoDataset(CustomDataset):
                           classwise=False,
                           proposal_nums=(100, 300, 1000),
                           iou_thrs=None,
-                          metric_items=None):
+                          metric_items=None,
+                          label_category=None):
         """Instance segmentation and object detection evaluation in COCO
         protocol.
 
@@ -434,7 +451,7 @@ class CocoDataset(CustomDataset):
 
         eval_results = OrderedDict()
         for metric in metrics:
-            msg = f'Evaluating {metric}...'
+            msg = f'Evaluating {label_category} - {metric}...'
             if logger is None:
                 msg = '\n' + msg
             print_log(msg, logger=logger)
@@ -481,7 +498,7 @@ class CocoDataset(CustomDataset):
                     level=logging.ERROR)
                 break
 
-            cocoEval = COCOeval(coco_gt, coco_det, iou_type, label_conversion_dict=self.label_conversion_dict)
+            cocoEval = COCOeval(coco_gt, coco_det, iou_type, label_conversion_dict=self.label_conversion_dict, label_category=label_category)
             cocoEval.params.catIds = self.cat_ids
             cocoEval.params.imgIds = self.img_ids
             cocoEval.params.maxDets = list(proposal_nums)
@@ -598,7 +615,8 @@ class CocoDataset(CustomDataset):
                  classwise=False,
                  proposal_nums=(100, 300, 1000),
                  iou_thrs=None,
-                 metric_items=None):
+                 metric_items=None,
+                 label_category=None):
         """Evaluation in COCO protocol.
 
         Args:
@@ -639,14 +657,16 @@ class CocoDataset(CustomDataset):
         coco_gt = self.coco
         self.cat_ids = coco_gt.get_cat_ids(cat_names=self.CLASSES)
         self.cat_ids = []
-        for i in range(len(self.label_conversion_dict['class_names'][self.label_conversion_dict['shape_category']])):
+        if label_category == None:
+            label_category = self.label_conversion_dict['shape_category']
+        for i in range(len(self.label_conversion_dict['class_names'][label_category])):
             self.cat_ids.append(i)
 
-        result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
+        result_files, tmp_dir = self.format_results(results, jsonfile_prefix, label_category=label_category)
         eval_results = self.evaluate_det_segm(results, result_files, coco_gt,
                                               metrics, logger, classwise,
                                               proposal_nums, iou_thrs,
-                                              metric_items)
+                                              metric_items, label_category=label_category)
 
         if tmp_dir is not None:
             tmp_dir.cleanup()
