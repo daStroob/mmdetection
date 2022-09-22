@@ -138,8 +138,6 @@ def draw_labels(ax,
     Returns:
         matplotlib.Axes: The result axes.
     """
-    # hacky but simple - set color to white permantently
-    color='w'
     
     for i, pos in enumerate(positions):
         label_text = ''
