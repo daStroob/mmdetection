@@ -66,7 +66,8 @@ class CustomDataset(Dataset):
                  proposal_file=None,
                  test_mode=False,
                  filter_empty_gt=True,
-                 file_client_args=dict(backend='disk')):
+                 file_client_args=dict(backend='disk'),
+                 label_conversion_dict=None):
         self.ann_file = ann_file
         self.data_root = data_root
         self.img_prefix = img_prefix
@@ -76,6 +77,7 @@ class CustomDataset(Dataset):
         self.filter_empty_gt = filter_empty_gt
         self.file_client = mmcv.FileClient(**file_client_args)
         self.CLASSES = self.get_classes(classes)
+        self.label_conversion_dict = label_conversion_dict
 
         # join paths if data_root is specified
         if self.data_root is not None:

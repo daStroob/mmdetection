@@ -14,7 +14,8 @@ from mmcv.utils import print_log
 from terminaltables import AsciiTable
 
 from mmdet.core import eval_recalls
-from .api_wrappers import COCO, COCOeval
+from .api_wrappers import COCO
+from .cocoevalmultilabel import COCOMultilabeleval as COCOeval
 from .builder import DATASETS
 from .custom import CustomDataset
 
@@ -480,7 +481,7 @@ class CocoDataset(CustomDataset):
                     level=logging.ERROR)
                 break
 
-            cocoEval = COCOeval(coco_gt, coco_det, iou_type)
+            cocoEval = COCOeval(coco_gt, coco_det, iou_type, label_conversion_dict=self.label_conversion_dict)
             cocoEval.params.catIds = self.cat_ids
             cocoEval.params.imgIds = self.img_ids
             cocoEval.params.maxDets = list(proposal_nums)
@@ -636,7 +637,10 @@ class CocoDataset(CustomDataset):
                 raise KeyError(f'metric {metric} is not supported')
 
         coco_gt = self.coco
-        self.cat_ids = [0,1,2,3,4,5,6,7,8]
+        self.cat_ids = coco_gt.get_cat_ids(cat_names=self.CLASSES)
+        self.cat_ids = []
+        for i in range(len(self.label_conversion_dict['class_names'][self.label_conversion_dict['shape_category']])):
+            self.cat_ids.append(i)
 
         result_files, tmp_dir = self.format_results(results, jsonfile_prefix)
         eval_results = self.evaluate_det_segm(results, result_files, coco_gt,

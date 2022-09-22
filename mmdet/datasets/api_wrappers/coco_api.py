@@ -5,7 +5,7 @@ import warnings
 
 import pycocotools
 from pycocotools.coco import COCO as _COCO
-from pycocotools.cocoeval import COCOeval as _COCOeval
+from mmdet.datasets.cocoevalmultilabel import COCOMultilabeleval as _COCOeval
 
 
 class COCO(_COCO):
