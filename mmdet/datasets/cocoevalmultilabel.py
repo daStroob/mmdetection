@@ -97,7 +97,7 @@ class COCOMultilabeleval:
                 ann['segmentation'] = rle
         p = self.params
         if p.useCats:
-            gts=self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=self.label_conversion_dict['conversion_ids'].keys()))
+            gts=self.cocoGt.loadAnns(self.cocoGt.getAnnIds(imgIds=p.imgIds, catIds=self.cocoGt.get_cat_ids(cat_names=self.label_conversion_dict['classes_keys'])))
             gts=copy.deepcopy(gts)
             for gt in gts:
                 obj_index = self.label_conversion_dict['classes_keys'].index(str(gt['category_id']).zfill(5))

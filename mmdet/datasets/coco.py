@@ -655,7 +655,6 @@ class CocoDataset(CustomDataset):
                 raise KeyError(f'metric {metric} is not supported')
 
         coco_gt = self.coco
-        self.cat_ids = coco_gt.get_cat_ids(cat_names=self.CLASSES)
         self.cat_ids = []
         if label_category == None:
             label_category = self.label_conversion_dict['shape_category']
